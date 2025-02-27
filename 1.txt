@@ -1,0 +1,109 @@
+import java.util.*;
+
+class Main {
+    static Map<Character, Set<Character>> first = new HashMap<>();
+    static Map<Character, Set<Character>> follow = new HashMap<>();
+    static Map<Character, List<String>> productions = new HashMap<>();
+    static char startSymbol;
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Enter the number of productions:");
+        int n = scanner.nextInt();
+        scanner.nextLine();
+        
+        System.out.println("Enter productions:");
+        for (int i = 0; i < n; i++) {
+            String production = scanner.nextLine();
+            char nonTerminal = production.charAt(0);
+            productions.putIfAbsent(nonTerminal, new ArrayList<>());
+            productions.get(nonTerminal).addAll(Arrays.asList(production.substring(3).split("\\|")));
+        }
+        
+        System.out.println("Enter start symbol:");
+        startSymbol = scanner.nextLine().charAt(0);
+        scanner.close();
+        
+        computeFirst();
+        computeFollow();
+        
+        System.out.println("FIRST sets:");
+        first.forEach((k, v) -> System.out.println(k + " : " + v));
+        
+        System.out.println("FOLLOW sets:");
+        follow.forEach((k, v) -> System.out.println(k + " : " + v));
+    }
+    
+    static void computeFirst() {
+        for (char nonTerminal : productions.keySet()) {
+            first.put(nonTerminal, new HashSet<>());
+        }
+
+        boolean changed;
+        do {
+            changed = false;
+            for (char nonTerminal : productions.keySet()) {
+                for (String rule : productions.get(nonTerminal)) {
+                    int i = 0;
+                    while (i < rule.length()) {
+                        char symbol = rule.charAt(i);
+                        if (!Character.isUpperCase(symbol)) {
+                            changed |= first.get(nonTerminal).add(symbol);
+                            break;
+                        } else {
+                            boolean hasEpsilon = false;
+                            for (char c : first.getOrDefault(symbol, new HashSet<>())) {
+                                if (c == 'ε') hasEpsilon = true;
+                                changed |= first.get(nonTerminal).add(c);
+                            }
+                            if (!hasEpsilon) break;
+                        }
+                        i++;
+                    }
+                    if (i == rule.length()) {
+                        changed |= first.get(nonTerminal).add('ε');
+                    }
+                }
+            }
+        } while (changed);
+    }
+    
+    static void computeFollow() {
+        for (char nonTerminal : productions.keySet()) {
+            follow.put(nonTerminal, new HashSet<>());
+        }
+        follow.get(startSymbol).add('$'); // Start symbol gets end marker
+
+        boolean changed;
+        do {
+            changed = false;
+            for (char nonTerminal : productions.keySet()) {
+                for (String rule : productions.get(nonTerminal)) {
+                    for (int i = 0; i < rule.length(); i++) {
+                        char symbol = rule.charAt(i);
+                        if (Character.isUpperCase(symbol)) {
+                            Set<Character> tempFollow = new HashSet<>();
+                            int j = i + 1;
+                            while (j < rule.length()) {
+                                char nextSymbol = rule.charAt(j);
+                                if (!Character.isUpperCase(nextSymbol)) {
+                                    tempFollow.add(nextSymbol);
+                                    break;
+                                } else {
+                                    tempFollow.addAll(first.get(nextSymbol));
+                                    if (!first.get(nextSymbol).contains('ε')) break;
+                                }
+                                j++;
+                            }
+                            if (j == rule.length() || tempFollow.contains('ε')) {
+                                tempFollow.remove('ε');
+                                tempFollow.addAll(follow.get(nonTerminal));
+                            }
+                            changed |= follow.get(symbol).addAll(tempFollow);
+                        }
+                    }
+                }
+            }
+        } while (changed);
+    }
+}
